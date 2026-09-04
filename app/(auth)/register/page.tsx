@@ -1,21 +1,22 @@
 "use client";
 
 /**
- * Register page — app/(auth)/register/page.tsx
+ * صفحة التسجيل — app/(auth)/register/page.tsx
  *
- * TEMPORARY minimal UI. All business logic lives in useRegister().
- * Replace only the JSX inside this file when the final design is ready.
+ * الـUI هنا مؤقت وبسيط. كل الـBusiness Logic موجود في useRegister().
+ * لما الـFinal Design يجهز، هنغيّر الـJSX الموجود في الملف ده بس.
  *
- * What this component does:
- *   - Redirects already-authenticated users to /account
- *   - Wires inputs to useRegister() for state, validation, and API submission
- *   - Navigates to /account when the backend auto-logs in after registration
- *   - Shows a success message when the backend requires a separate step
- *     (e.g. email verification) instead of auto-logging in
+ * الصفحة دي بتعمل إيه؟
+ *   - لو اليوزر عامل Login بالفعل، بتحوّله تلقائيًا على /account
+ *   - بتوصل الـInputs بـuseRegister() عشان يدير الـState والـValidation
+ *     وإرسال بيانات التسجيل للـAPI
+ *   - لو الـBackend عمل Auto-Login بعد التسجيل، بتنقل اليوزر على /account
+ *   - لو الـBackend محتاج خطوة إضافية بعد التسجيل (زي تأكيد الإيميل)،
+ *     بتعرض رسالة نجاح بتطلب من اليوزر يكمل الخطوة دي
  *
- *  Whether registration redirects directly to /account or shows a
- *     "check your email" message depends on the backend. Both paths
- *     are handled here via the onSuccess callback.
+ * التحويل على /account مباشرة أو ظهور رسالة زي "راجع إيميلك"
+ * بيعتمد على طريقة الـBackend في التعامل مع التسجيل.
+ * الاتنين متغطّيين هنا عن طريق onSuccess callback.
  */
 
 import { useEffect } from "react";
