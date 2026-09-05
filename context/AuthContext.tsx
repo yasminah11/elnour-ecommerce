@@ -2,22 +2,8 @@
 
 /**
  * AuthContext — global authentication state.
- *
- * Provides:
- *   user            — the currently authenticated User, or null
- *   isLoading       — true while the initial session check runs on mount
- *   isAuthenticated — derived boolean (!!user)
- *   login()         — calls loginApi, stores tokens, sets user
- *   register()      — calls registerApi, stores tokens if returned, sets user
- *   logout()        — calls logoutApi, clears tokens, resets user to null
- *   refreshUser()   — re-fetches the user profile (call after a profile update)
- *
- * Usage:
- *   Wrap the root layout with <AuthProvider>.
- *   Consume state and actions in any Client Component via useAuth().
- *
- *   AuthContext calls getMeApi() on mount when a token is present.
- *     The endpoint used ("/auth/me/") is a placeholder — confirm with backend.
+ * Updated to match the backend field names (firstName, lastName, cPassword)
+ * and new endpoints (signin, signup, confirm-email, resend-otp).
  */
 
 import React, {
@@ -28,7 +14,13 @@ import React, {
   useState,
 } from "react";
 
-import { loginApi, logoutApi, registerApi } from "@/lib/api/authService";
+import {
+  loginApi,
+  logoutApi,
+  registerApi,
+  confirmEmailApi,
+  resendOtpApi,
+} from "@/lib/api/authService";
 import { getMeApi } from "@/lib/api/customerService";
 import { hasValidSession, clearTokens } from "@/lib/auth/tokenStorage";
 import type {
@@ -37,6 +29,8 @@ import type {
   LoginResponse,
   RegisterPayload,
   RegisterResponse,
+  ConfirmEmailPayload,
+  ResendOtpPayload,
   ApiError,
 } from "@/lib/types/auth";
 
@@ -48,6 +42,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<LoginResponse>;
   register: (payload: RegisterPayload) => Promise<RegisterResponse>;
+  confirmEmail: (payload: ConfirmEmailPayload) => Promise<void>;
+  resendOtp: (payload: ResendOtpPayload) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -60,10 +56,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * On mount: if a valid token exists in cookies, fetch the user profile
-   * to hydrate the auth state without requiring a new login.
-   */
   useEffect(() => {
     const init = async () => {
       if (!hasValidSession()) {
@@ -100,12 +92,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(
     async (payload: RegisterPayload): Promise<RegisterResponse> => {
       const data = await registerApi(payload);
-      // If the backend auto-logs in on register (returns tokens + user), hydrate state.
-      // If it requires a separate login step or email verification, user stays null.
+      // Auto-login if backend returns tokens
       if (data.user && data.access) {
         setUser(data.user);
       }
       return data;
+    },
+    [],
+  );
+
+  const confirmEmail = useCallback(
+    async (payload: ConfirmEmailPayload): Promise<void> => {
+      await confirmEmailApi(payload);
+    },
+    [],
+  );
+
+  const resendOtp = useCallback(
+    async (payload: ResendOtpPayload): Promise<void> => {
+      await resendOtpApi(payload);
     },
     [],
   );
@@ -132,6 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     login,
     register,
+    confirmEmail,
+    resendOtp,
     logout,
     refreshUser,
   };
@@ -141,7 +148,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 /* ── Hook ───────────────────────────────────────────────────────────── */
 
-/** Consume auth state and actions. Must be used inside <AuthProvider>. */
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
