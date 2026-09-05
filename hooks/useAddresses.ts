@@ -2,14 +2,8 @@
 
 /**
  * useAddresses hook.
- *
- * Manages the authenticated customer's saved delivery addresses.
- * Source: FR-AUTH-06 — customers can maintain saved addresses.
- *
- * Provides: fetch, add, edit, delete, set default.
- *
- * ⚠️  All API endpoint paths are placeholders — confirm with backend.
- *     See customerService.ts for the full list of paths that need confirming.
+ * Updated to use _id (string) to match MongoDB backend.
+ * Source: FR-AUTH-06
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -43,7 +37,7 @@ export function useAddresses() {
       setAddresses(data);
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      setFetchError(apiErr?.message ?? "Failed to load addresses.");
+      setFetchError(apiErr?.message ?? "فشل تحميل العناوين.");
     } finally {
       setIsFetching(false);
     }
@@ -51,9 +45,7 @@ export function useAddresses() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     let cancelled = false;
-
     const load = async () => {
       setIsFetching(true);
       setFetchError(null);
@@ -63,15 +55,13 @@ export function useAddresses() {
       } catch (err: unknown) {
         if (!cancelled) {
           const apiErr = err as ApiError;
-          setFetchError(apiErr?.message ?? "Failed to load addresses.");
+          setFetchError(apiErr?.message ?? "فشل تحميل العناوين.");
         }
       } finally {
         if (!cancelled) setIsFetching(false);
       }
     };
-
     void load();
-
     return () => {
       cancelled = true;
     };
@@ -79,7 +69,7 @@ export function useAddresses() {
 
   /* ── Create ──────────────────────────────────────────────────────────── */
 
-  const addAddress = useCallback(async (address: Omit<Address, "id">) => {
+  const addAddress = useCallback(async (address: Omit<Address, "_id">) => {
     setIsMutating(true);
     setMutateError(null);
     try {
@@ -88,7 +78,7 @@ export function useAddresses() {
       return created;
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      setMutateError(apiErr?.message ?? "Failed to add address.");
+      setMutateError(apiErr?.message ?? "فشل إضافة العنوان.");
       throw err;
     } finally {
       setIsMutating(false);
@@ -98,16 +88,16 @@ export function useAddresses() {
   /* ── Update ──────────────────────────────────────────────────────────── */
 
   const editAddress = useCallback(
-    async (id: number, updates: Partial<Omit<Address, "id">>) => {
+    async (id: string, updates: Partial<Omit<Address, "_id">>) => {
       setIsMutating(true);
       setMutateError(null);
       try {
         const updated = await updateAddressApi(id, updates);
-        setAddresses((prev) => prev.map((a) => (a.id === id ? updated : a)));
+        setAddresses((prev) => prev.map((a) => (a._id === id ? updated : a)));
         return updated;
       } catch (err: unknown) {
         const apiErr = err as ApiError;
-        setMutateError(apiErr?.message ?? "Failed to update address.");
+        setMutateError(apiErr?.message ?? "فشل تحديث العنوان.");
         throw err;
       } finally {
         setIsMutating(false);
@@ -118,15 +108,15 @@ export function useAddresses() {
 
   /* ── Delete ──────────────────────────────────────────────────────────── */
 
-  const removeAddress = useCallback(async (id: number) => {
+  const removeAddress = useCallback(async (id: string) => {
     setIsMutating(true);
     setMutateError(null);
     try {
       await deleteAddressApi(id);
-      setAddresses((prev) => prev.filter((a) => a.id !== id));
+      setAddresses((prev) => prev.filter((a) => a._id !== id));
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      setMutateError(apiErr?.message ?? "Failed to delete address.");
+      setMutateError(apiErr?.message ?? "فشل حذف العنوان.");
       throw err;
     } finally {
       setIsMutating(false);
@@ -135,17 +125,17 @@ export function useAddresses() {
 
   /* ── Set default ─────────────────────────────────────────────────────── */
 
-  const setDefault = useCallback(async (id: number) => {
+  const setDefault = useCallback(async (id: string) => {
     setIsMutating(true);
     setMutateError(null);
     try {
       const updated = await setDefaultAddressApi(id);
       setAddresses((prev) =>
-        prev.map((a) => (a.id === id ? updated : { ...a, is_default: false })),
+        prev.map((a) => (a._id === id ? updated : { ...a, is_default: false })),
       );
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      setMutateError(apiErr?.message ?? "Failed to set default address.");
+      setMutateError(apiErr?.message ?? "فشل تعيين العنوان الافتراضي.");
       throw err;
     } finally {
       setIsMutating(false);
