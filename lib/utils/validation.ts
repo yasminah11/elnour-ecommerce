@@ -1,37 +1,22 @@
 /**
  * Client-side validation helpers for auth forms.
- *
- * Philosophy:
- *   - Validate only what is genuinely useful before a network round-trip:
- *     empty required fields and obviously wrong formats.
- *   - Do NOT duplicate backend business rules. Backend validation errors
- *     are surfaced through the ApiFieldErrors mechanism in each hook.
- *   - Do NOT invent rules that haven't been specified (e.g. exact password
- *     complexity rules — those belong to the backend).
- *
- *   The 8-character minimum password length is a basic UX guard only.
- *     The real password policy is enforced by the backend — confirm it
- *     and update this file to match if the backend requires stricter rules.
- *
- *   Phone validation: the SRS specifies the project is in Egypt and
- *     collects phone numbers (FR-AUTH-03), but does not specify a client-side
- *     format rule. The validation here only checks that the field is not empty.
- *     If the backend confirms an expected phone format, add the regex here.
+ * Field names match the backend schema:
+ *   firstName, lastName, cPassword (confirm password), phone
  */
 
 /* ── Individual field validators ──────────────────────────────────────── */
 
 export function validateEmail(value: string): string | null {
-  if (!value.trim()) return "Email is required.";
+  if (!value.trim()) return "البريد الإلكتروني مطلوب.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    return "Please enter a valid email address.";
+    return "يرجى إدخال بريد إلكتروني صحيح.";
   }
   return null;
 }
 
 export function validatePassword(value: string): string | null {
-  if (!value) return "Password is required.";
-  if (value.length < 8) return "Password must be at least 8 characters.";
+  if (!value) return "كلمة المرور مطلوبة.";
+  if (value.length < 7) return "كلمة المرور يجب أن تكون 7 أحرف على الأقل.";
   return null;
 }
 
@@ -39,17 +24,17 @@ export function validatePasswordConfirm(
   password: string,
   confirm: string,
 ): string | null {
-  if (!confirm) return "Please confirm your password.";
-  if (password !== confirm) return "Passwords do not match.";
+  if (!confirm) return "يرجى تأكيد كلمة المرور.";
+  if (password !== confirm) return "كلمتا المرور غير متطابقتين.";
   return null;
 }
 
 export function validateRequired(value: string, label: string): string | null {
-  if (!value.trim()) return `${label} is required.`;
+  if (!value.trim()) return `${label} مطلوب.`;
   return null;
 }
 
-/* ── Form-level validators ────────────────────────────────────────────── */
+/* ── Login form ────────────────────────────────────────────────────────── */
 
 export interface LoginFormValues {
   email: string;
@@ -71,22 +56,24 @@ export function validateLoginForm(values: LoginFormValues): LoginFormErrors {
   return errors;
 }
 
+/* ── Register form — field names match backend signUp controller ───────── */
+
 export interface RegisterFormValues {
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   password: string;
-  password_confirm: string;
+  cPassword: string; // confirm password — matches backend field
 }
 
 export interface RegisterFormErrors {
-  first_name?: string;
-  last_name?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   phone?: string;
   password?: string;
-  password_confirm?: string;
+  cPassword?: string;
   [key: string]: string | undefined;
 }
 
@@ -95,28 +82,70 @@ export function validateRegisterForm(
 ): RegisterFormErrors {
   const errors: RegisterFormErrors = {};
 
-  const firstNameErr = validateRequired(values.first_name, "First name");
-  if (firstNameErr) errors.first_name = firstNameErr;
+  const firstNameErr = validateRequired(values.firstName, "الاسم الأول");
+  if (firstNameErr) errors.firstName = firstNameErr;
 
-  const lastNameErr = validateRequired(values.last_name, "Last name");
-  if (lastNameErr) errors.last_name = lastNameErr;
+  const lastNameErr = validateRequired(values.lastName, "الاسم الأخير");
+  if (lastNameErr) errors.lastName = lastNameErr;
 
   const emailErr = validateEmail(values.email);
   if (emailErr) errors.email = emailErr;
 
-  // Phone: only required check.  Add format validation once backend confirms expected format.
-  const phoneErr = validateRequired(values.phone, "Phone number");
+  const phoneErr = validateRequired(values.phone, "رقم الهاتف");
   if (phoneErr) errors.phone = phoneErr;
 
   const passwordErr = validatePassword(values.password);
   if (passwordErr) errors.password = passwordErr;
 
-  const confirmErr = validatePasswordConfirm(
-    values.password,
-    values.password_confirm,
-  );
-  if (confirmErr) errors.password_confirm = confirmErr;
+  const confirmErr = validatePasswordConfirm(values.password, values.cPassword);
+  if (confirmErr) errors.cPassword = confirmErr;
 
+  return errors;
+}
+
+/* ── OTP confirmation form ─────────────────────────────────────────────── */
+
+export interface ConfirmEmailFormValues {
+  email: string;
+  code: string;
+}
+
+export interface ConfirmEmailFormErrors {
+  email?: string;
+  code?: string;
+  [key: string]: string | undefined;
+}
+
+export function validateConfirmEmailForm(
+  values: ConfirmEmailFormValues,
+): ConfirmEmailFormErrors {
+  const errors: ConfirmEmailFormErrors = {};
+  const emailErr = validateEmail(values.email);
+  if (emailErr) errors.email = emailErr;
+  if (!values.code.trim()) errors.code = "كود التحقق مطلوب.";
+  return errors;
+}
+
+/* ── Update password form ──────────────────────────────────────────────── */
+
+export interface UpdatePasswordFormValues {
+  oldPassword: string;
+  newPassword: string;
+}
+
+export interface UpdatePasswordFormErrors {
+  oldPassword?: string;
+  newPassword?: string;
+  [key: string]: string | undefined;
+}
+
+export function validateUpdatePasswordForm(
+  values: UpdatePasswordFormValues,
+): UpdatePasswordFormErrors {
+  const errors: UpdatePasswordFormErrors = {};
+  if (!values.oldPassword) errors.oldPassword = "كلمة المرور الحالية مطلوبة.";
+  const newPwErr = validatePassword(values.newPassword);
+  if (newPwErr) errors.newPassword = newPwErr;
   return errors;
 }
 
