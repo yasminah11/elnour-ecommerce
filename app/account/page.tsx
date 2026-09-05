@@ -1,24 +1,8 @@
 "use client";
 
 /**
- * Account page — app/account/page.tsx
- *
- * TEMPORARY minimal UI. All business logic lives in the hooks below.
- * Replace only the JSX inside this file when the final design is ready.
- *
- * What this component does:
- *   - Protects the route: redirects unauthenticated users to /login
- *   - Displays the authenticated user's personal information (read mode)
- *   - Provides an inline edit form for personal information (useProfile)
- *   - Lists linked authentication providers (useLinkedProviders)
- *   - Lists saved addresses (useAddresses)
- *   - Provides a logout button
- *
- * Sections that need UI/UX design before they are production-ready:
- *   - The full account dashboard layout
- *   - Add / edit / delete address forms
- *   - Link / unlink provider UI (buttons per provider)
- *   - Business information section (for business accounts)
+ * Account page — updated to match backend field names:
+ *   firstName, lastName (camelCase — matches backend schema)
  */
 
 import { useEffect, useState } from "react";
@@ -50,27 +34,25 @@ export default function AccountPage() {
     fetchError: addressesError,
   } = useAddresses();
 
-  // ── Route guard ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // ── Local edit form state ─────────────────────────────────────────────
   const [editMode, setEditMode] = useState(false);
   const [editValues, setEditValues] = useState({
-    first_name: "",
-    last_name: "",
+    firstName: "",
+    lastName: "",
     phone: "",
   });
 
   const handleEditStart = () => {
     if (!user) return;
     setEditValues({
-      first_name: user.first_name,
-      last_name: user.last_name,
-      phone: user.phone,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone ?? "",
     });
     setEditMode(true);
   };
@@ -96,40 +78,38 @@ export default function AccountPage() {
     router.push("/");
   };
 
-  // ── Loading / auth guard ─────────────────────────────────────────────
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
-        Loading…
+        جاري التحميل…
       </div>
     );
   }
 
   if (!user) return null;
 
-  // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">My Account</h1>
+        <h1 className="text-2xl font-bold">حسابي</h1>
         <button
           onClick={handleLogout}
           className="text-sm text-red-600 hover:underline"
         >
-          Sign Out
+          تسجيل الخروج
         </button>
       </div>
 
-      {/* ── Personal Information ──────────────────────────────────────── */}
+      {/* ── Personal Information ─────────────────────────────────────── */}
       <section className="mb-8 p-4 border border-gray-200 rounded">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Personal Information</h2>
+          <h2 className="font-semibold">البيانات الشخصية</h2>
           {!editMode && (
             <button
               onClick={handleEditStart}
               className="text-sm text-[#1a3a6b] hover:underline"
             >
-              Edit
+              تعديل
             </button>
           )}
         </div>
@@ -147,7 +127,7 @@ export default function AccountPage() {
             role="status"
             className="mb-3 p-2 bg-green-50 border border-green-200 text-green-700 rounded text-sm"
           >
-            Profile updated successfully.
+            تم تحديث البيانات بنجاح.
           </div>
         )}
 
@@ -156,11 +136,11 @@ export default function AccountPage() {
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs font-medium mb-1">
-                  First Name
+                  الاسم الأول
                 </label>
                 <input
-                  name="first_name"
-                  value={editValues.first_name}
+                  name="firstName"
+                  value={editValues.firstName}
                   onChange={handleEditChange}
                   disabled={isUpdating}
                   className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm"
@@ -168,11 +148,11 @@ export default function AccountPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">
-                  Last Name
+                  الاسم الأخير
                 </label>
                 <input
-                  name="last_name"
-                  value={editValues.last_name}
+                  name="lastName"
+                  value={editValues.lastName}
                   onChange={handleEditChange}
                   disabled={isUpdating}
                   className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm"
@@ -180,7 +160,9 @@ export default function AccountPage() {
               </div>
             </div>
             <div className="mb-3">
-              <label className="block text-xs font-medium mb-1">Phone</label>
+              <label className="block text-xs font-medium mb-1">
+                رقم الهاتف
+              </label>
               <input
                 name="phone"
                 value={editValues.phone}
@@ -195,7 +177,7 @@ export default function AccountPage() {
                 disabled={isUpdating}
                 className="px-4 py-1.5 bg-[#1a3a6b] text-white text-sm rounded disabled:opacity-60"
               >
-                {isUpdating ? "Saving…" : "Save"}
+                {isUpdating ? "جاري الحفظ…" : "حفظ"}
               </button>
               <button
                 type="button"
@@ -205,39 +187,69 @@ export default function AccountPage() {
                 }}
                 className="px-4 py-1.5 border border-gray-300 text-sm rounded"
               >
-                Cancel
+                إلغاء
               </button>
             </div>
           </form>
         ) : (
           <dl className="grid grid-cols-2 gap-y-2 text-sm">
-            <dt className="text-gray-500">Name</dt>
+            <dt className="text-gray-500">الاسم</dt>
             <dd>
-              {user.first_name} {user.last_name}
+              {user.firstName} {user.lastName}
             </dd>
-            <dt className="text-gray-500">Email</dt>
+            <dt className="text-gray-500">البريد الإلكتروني</dt>
             <dd>{user.email}</dd>
-            <dt className="text-gray-500">Phone</dt>
-            <dd>{user.phone}</dd>
-            <dt className="text-gray-500">Account type</dt>
-            <dd className="capitalize">{user.customer_type}</dd>
+            <dt className="text-gray-500">رقم الهاتف</dt>
+            <dd>{user.phone ?? "—"}</dd>
+            <dt className="text-gray-500">نوع الحساب</dt>
+            <dd className="capitalize">
+              {user.customerType === "business" ? "شركة" : "عميل"}
+            </dd>
+            <dt className="text-gray-500">حالة البريد</dt>
+            <dd>{user.confirmed ? "✅ مؤكد" : "⏳ في انتظار التأكيد"}</dd>
           </dl>
         )}
       </section>
 
-      {/* ── Linked Authentication ─────────────────────────────────────── */}
+      {/* ── Billing Info ─────────────────────────────────────────────── */}
+      {user.billingInfo && (
+        <section className="mb-8 p-4 border border-gray-200 rounded">
+          <h2 className="font-semibold mb-3">بيانات الفوترة</h2>
+          <dl className="grid grid-cols-2 gap-y-2 text-sm">
+            <dt className="text-gray-500">الاسم</dt>
+            <dd>{user.billingInfo.billingName}</dd>
+            <dt className="text-gray-500">العنوان</dt>
+            <dd>{user.billingInfo.billingAddress}</dd>
+          </dl>
+        </section>
+      )}
+
+      {/* ── Business Info ─────────────────────────────────────────────── */}
+      {user.customerType === "business" && user.businessInfo && (
+        <section className="mb-8 p-4 border border-gray-200 rounded">
+          <h2 className="font-semibold mb-3">بيانات الشركة</h2>
+          <dl className="grid grid-cols-2 gap-y-2 text-sm">
+            <dt className="text-gray-500">اسم الشركة</dt>
+            <dd>{user.businessInfo.companyName}</dd>
+            {user.businessInfo.companyBillingInfo && (
+              <>
+                <dt className="text-gray-500">بيانات الفوترة</dt>
+                <dd>{user.businessInfo.companyBillingInfo}</dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
+
+      {/* ── Linked Accounts ───────────────────────────────────────────── */}
       <section className="mb-8 p-4 border border-gray-200 rounded">
-        <h2 className="font-semibold mb-3">Linked Accounts</h2>
+        <h2 className="font-semibold mb-3">الحسابات المرتبطة</h2>
         {fetchingProviders ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <p className="text-sm text-gray-400">جاري التحميل…</p>
         ) : providersError ? (
           <p className="text-sm text-red-500">{providersError}</p>
         ) : providers.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No linked accounts.
-            {/* TODO: Link/unlink buttons will be added with the final UI design
-                once the backend confirms the supported providers. */}
-          </p>
+          <p className="text-sm text-gray-500">لا توجد حسابات مرتبطة.</p>
         ) : (
           <ul className="space-y-2">
             {providers.map((p) => (
@@ -246,8 +258,7 @@ export default function AccountPage() {
                 className="flex items-center justify-between text-sm"
               >
                 <span className="capitalize">{p.provider}</span>
-                <span className="text-gray-400 text-xs">Connected</span>
-                {/* TODO: Unlink button — add with final UI design */}
+                <span className="text-gray-400 text-xs">متصل</span>
               </li>
             ))}
           </ul>
@@ -256,31 +267,27 @@ export default function AccountPage() {
 
       {/* ── Saved Addresses ───────────────────────────────────────────── */}
       <section className="p-4 border border-gray-200 rounded">
-        <h2 className="font-semibold mb-3">Saved Addresses</h2>
+        <h2 className="font-semibold mb-3">العناوين المحفوظة</h2>
         {fetchingAddresses ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <p className="text-sm text-gray-400">جاري التحميل…</p>
         ) : addressesError ? (
           <p className="text-sm text-red-500">{addressesError}</p>
         ) : addresses.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No saved addresses.
-            {/* TODO: Add address form/button will be added with the final UI design */}
-          </p>
+          <p className="text-sm text-gray-500">لا توجد عناوين محفوظة.</p>
         ) : (
           <ul className="space-y-2">
             {addresses.map((a) => (
               <li
-                key={a.id}
+                key={a._id}
                 className="text-sm border border-gray-100 rounded p-2"
               >
                 {a.label && <span className="font-medium">{a.label} — </span>}
                 {a.city}, {a.street}
                 {a.is_default && (
                   <span className="ml-2 text-xs text-green-600 font-semibold">
-                    Default
+                    افتراضي
                   </span>
                 )}
-                {/* TODO: Edit / Delete / Set Default buttons — add with final UI design */}
               </li>
             ))}
           </ul>
