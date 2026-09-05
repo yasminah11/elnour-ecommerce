@@ -2,21 +2,12 @@
 
 /**
  * useRegister hook.
+ * Field names updated to match the backend signUp controller:
+ *   firstName, lastName, cPassword (confirm password)
  *
- * Manages all registration form state, validation, API submission, and error handling.
- * The UI component only needs to wire inputs and the submit button to this hook.
- *
- * Usage:
- *   const { values, errors, apiError, successMessage, isLoading, handleChange, handleSubmit } =
- *     useRegister({
- *       onSuccess: (data) => {
- *         if (data.access) router.push("/account"); // backend auto-logged-in
- *         // otherwise: stay on page and show successMessage (e.g. "check your email")
- *       },
- *     });
- *
- * ⚠️  Whether the backend auto-logs in after registration (returns tokens)
- *     or requires a separate step must be confirmed. Both paths are handled here.
+ * The backend signUp controller also supports:
+ *   address, billingInfo, customerType, businessInfo
+ * These are optional and not included in the basic registration form.
  */
 
 import { useState, useCallback } from "react";
@@ -37,12 +28,12 @@ export function useRegister(options: UseRegisterOptions = {}) {
   const { register } = useAuth();
 
   const [values, setValues] = useState<RegisterFormValues>({
-    first_name: "",
-    last_name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
     password: "",
-    password_confirm: "",
+    cPassword: "",
   });
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
@@ -75,17 +66,16 @@ export function useRegister(options: UseRegisterOptions = {}) {
 
       try {
         const data = await register({
-          first_name: values.first_name,
-          last_name: values.last_name,
+          firstName: values.firstName,
+          lastName: values.lastName,
           email: values.email,
           phone: values.phone,
           password: values.password,
-          password_confirm: values.password_confirm,
+          cPassword: values.cPassword,
         });
 
-        // Surface any message the backend sends (e.g. "check your email")
-        if (data.message || data.detail) {
-          setSuccessMessage(data.message ?? data.detail ?? null);
+        if (data.message) {
+          setSuccessMessage(data.message);
         }
 
         options.onSuccess?.(data);
@@ -94,18 +84,17 @@ export function useRegister(options: UseRegisterOptions = {}) {
         if (apiErr?.fieldErrors) {
           const mapped: RegisterFormErrors = {};
           const fe = apiErr.fieldErrors;
-          if (fe.first_name) mapped.first_name = fe.first_name[0];
-          if (fe.last_name) mapped.last_name = fe.last_name[0];
+          if (fe.firstName) mapped.firstName = fe.firstName[0];
+          if (fe.lastName) mapped.lastName = fe.lastName[0];
           if (fe.email) mapped.email = fe.email[0];
           if (fe.phone) mapped.phone = fe.phone[0];
           if (fe.password) mapped.password = fe.password[0];
-          if (fe.password_confirm)
-            mapped.password_confirm = fe.password_confirm[0];
+          if (fe.cPassword) mapped.cPassword = fe.cPassword[0];
           setErrors(mapped);
           if (fe.non_field_errors) setApiError(fe.non_field_errors[0]);
         } else {
           setApiError(
-            apiErr?.message ?? "Registration failed. Please try again.",
+            apiErr?.message ?? "فشل إنشاء الحساب. يرجى المحاولة مرة أخرى.",
           );
         }
       } finally {
