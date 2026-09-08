@@ -1,18 +1,11 @@
 /**
- * Base API client.
+ * Base API client — corrected to match the ACTUAL backend:
  *
- * Responsibilities:
- *   1. Prepend the configured API base URL to every request.
- *   2. Inject the access token (Bearer header) on authenticated requests.
- *   3. On 401, attempt a single silent token refresh, then retry once.
- *   4. Parse backend error responses into a typed ApiError.
- *
- *   REQUIRES BACKEND CONFIRMATION:
- *   - The Authorization header scheme ("Bearer" is assumed — confirm with backend).
- *   - The token refresh endpoint path — currently read from config.auth.tokenRefreshPath.
- *   - The refresh request body shape — currently { refresh: <token> }.
- *   - The error response body shape — currently assumes { detail, <field>: [msgs] }.
- *   - Whether the backend rotates the refresh token on refresh.
+ *  ✅ Auth header: "auth: bearer <token>"  (backend reads req.headers.auth)
+ *  ✅ Prefix: "bearer" (lowercase, from config PERFIX=bearer)
+ *  ✅ Response shape: { message, data } — unwrap data before returning
+ *  ✅ Refresh token: GET /auth/user/refresh-token with "authentication" header
+ *  ✅ Error shape: { message } (not { detail })
  */
 
 import { config } from "@/lib/config";
@@ -23,57 +16,34 @@ import {
   setTokens,
   clearTokens,
 } from "@/lib/auth/tokenStorage";
-import type {
-  ApiError,
-  ApiFieldErrors,
-  RefreshResponse,
-} from "@/lib/types/auth";
+import type { ApiError, ApiResponse, RefreshResponse } from "@/lib/types/auth";
 
 /* ── Error parsing ──────────────────────────────────────────────────── */
 
-/**
- * Converts a non-2xx response into a typed ApiError.
- *
- *  The error body shape { detail, <field>: [messages] } is common but
- *     must be confirmed against the real backend error responses.
- */
 async function parseApiError(response: Response): Promise<ApiError> {
   let body: Record<string, unknown> = {};
   try {
     body = await response.json();
   } catch {
-    // Response body is not JSON — use status text
+    // Response body is not JSON
   }
 
   const message =
-    typeof body.detail === "string"
-      ? body.detail
+    typeof body.message === "string"
+      ? body.message
       : response.statusText || "An unexpected error occurred.";
-
-  const fieldErrors: ApiFieldErrors = {};
-  for (const [key, value] of Object.entries(body)) {
-    if (key !== "detail" && Array.isArray(value)) {
-      fieldErrors[key] = value as string[];
-    }
-  }
 
   return {
     status: response.status,
     message,
-    fieldErrors: Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined,
   };
 }
 
 /* ── Silent token refresh ───────────────────────────────────────────── */
 
 /**
- * Attempts to get a new access token using the stored refresh token.
- * Returns the new access token string, or null if refresh fails.
- *
- *   REQUIRES BACKEND CONFIRMATION:
- *   - Endpoint path: config.auth.tokenRefreshPath (currently "/auth/token/refresh/")
- *   - Request body: { refresh: string } — confirm field name with backend
- *   - Response body: { access: string, refresh?: string }
+ * Backend refresh: GET /auth/user/refresh-token
+ * Sends the refresh token in "authentication: bearer <token>" header
  */
 async function silentRefresh(): Promise<string | null> {
   const refreshToken = getRefreshToken();
@@ -83,9 +53,11 @@ async function silentRefresh(): Promise<string | null> {
     const res = await fetch(
       `${config.apiBaseUrl}${config.auth.tokenRefreshPath}`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh: refreshToken }),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          authentication: `bearer ${refreshToken}`,
+        },
       },
     );
 
@@ -94,14 +66,19 @@ async function silentRefresh(): Promise<string | null> {
       return null;
     }
 
-    const data: RefreshResponse = await res.json();
-    if (data.refresh) {
-      // Backend rotated the refresh token — store both
-      setTokens(data.access, data.refresh);
-    } else {
-      setAccessToken(data.access);
+    const json: ApiResponse<RefreshResponse> = await res.json();
+    const data = json.data;
+    if (!data) {
+      clearTokens();
+      return null;
     }
-    return data.access;
+
+    if (data.refresh_token) {
+      setTokens(data.access_token, data.refresh_token);
+    } else {
+      setAccessToken(data.access_token);
+    }
+    return data.access_token;
   } catch {
     clearTokens();
     return null;
@@ -112,25 +89,25 @@ async function silentRefresh(): Promise<string | null> {
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
-  /** Set true for login/register — skips injecting the Authorization header */
+  /** Set true for login/register/confirm-email — skips auth header */
   skipAuth?: boolean;
   /** Internal flag — prevents infinite retry loop on 401 */
   _isRetry?: boolean;
+  /** Return raw response without unwrapping .data */
+  rawResponse?: boolean;
 }
 
-/**
- * Makes a request to the backend API.
- *
- * @param path    Relative path, e.g. "/auth/login/" — prepended with apiBaseUrl
- * @param options Extended fetch options
- * @returns       Parsed response body as T
- * @throws        ApiError on any non-2xx response
- */
 export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { body, skipAuth = false, _isRetry = false, ...fetchOptions } = options;
+  const {
+    body,
+    skipAuth = false,
+    _isRetry = false,
+    rawResponse = false,
+    ...fetchOptions
+  } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -140,8 +117,8 @@ export async function request<T>(
   if (!skipAuth) {
     const token = getAccessToken();
     if (token) {
-      //   "Bearer" scheme assumed — confirm with backend
-      headers["Authorization"] = `Bearer ${token}`;
+      // Backend reads req.headers.auth with prefix "bearer" (lowercase)
+      headers["auth"] = `bearer ${token}`;
     }
   }
 
@@ -160,7 +137,7 @@ export async function request<T>(
     clearTokens();
     const sessionErr: ApiError = {
       status: 401,
-      message: "Session expired. Please log in again.",
+      message: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
     };
     throw sessionErr;
   }
@@ -175,7 +152,15 @@ export async function request<T>(
     return undefined as unknown as T;
   }
 
-  return response.json() as Promise<T>;
+  // ── Unwrap { message, data } response shape ──────────────────────────
+  const json: ApiResponse<T> = await response.json();
+
+  if (rawResponse) {
+    return json as unknown as T;
+  }
+
+  // Return data if present, otherwise return the full response
+  return (json.data !== undefined ? json.data : json) as T;
 }
 
 /* ── Convenience wrappers ───────────────────────────────────────────── */
