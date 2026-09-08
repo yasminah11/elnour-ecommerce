@@ -1,16 +1,18 @@
 /**
  * Centralised runtime configuration.
- * Updated to match the backend API contract.
+ * Matched to the actual backend running on port 3001.
+ *
+ * Backend base: http://localhost:3001
+ * Customer auth prefix: /auth/user
  */
 
 export const config = {
   /**
    * Base URL of the backend API — no trailing slash.
    * Set NEXT_PUBLIC_API_BASE_URL in .env.local.
-   * Example: http://localhost:8000/api
+   * Backend runs on port 3001.
    */
-  apiBaseUrl:
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api",
+  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001",
 
   auth: {
     /** Cookie key used to store the access token client-side. */
@@ -19,16 +21,16 @@ export const config = {
     /** Cookie key used to store the refresh token client-side. */
     refreshTokenKey: "elnour_refresh",
 
-    /** How many days the access token cookie survives (match backend TTL). */
+    /** How many days the access token cookie survives. */
     accessTokenCookieDays: 1,
 
-    /** How many days the refresh token cookie survives (match backend TTL). */
+    /** How many days the refresh token cookie survives. */
     refreshTokenCookieDays: 30,
 
     /**
-     * The backend uses JWT — token refresh endpoint.
-     * Backend issues access + refresh tokens on login/register.
+     * Backend refresh token endpoint.
+     * Backend: GET /auth/user/refresh-token  (sends token in "authentication" header)
      */
-    tokenRefreshPath: "/auth/token/refresh/",
+    tokenRefreshPath: "/auth/user/refresh-token",
   },
 } as const;
