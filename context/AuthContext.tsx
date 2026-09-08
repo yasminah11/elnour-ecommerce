@@ -2,8 +2,10 @@
 
 /**
  * AuthContext — global authentication state.
- * Updated to match the backend field names (firstName, lastName, cPassword)
- * and new endpoints (signin, signup, confirm-email, resend-otp).
+ * Fixed to match actual backend:
+ *  - Uses getProfileApi (GET /auth/user/profile) instead of getMeApi
+ *  - Login returns { access_token, refresh_token } not { access, refresh }
+ *  - Register does NOT auto-login (backend requires email confirmation first)
  */
 
 import React, {
@@ -20,8 +22,8 @@ import {
   registerApi,
   confirmEmailApi,
   resendOtpApi,
+  getProfileApi,
 } from "@/lib/api/authService";
-import { getMeApi } from "@/lib/api/customerService";
 import { hasValidSession, clearTokens } from "@/lib/auth/tokenStorage";
 import type {
   User,
@@ -63,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const me = await getMeApi();
+        const me = await getProfileApi();
         setUser(me);
       } catch (err: unknown) {
         const apiErr = err as ApiError;
@@ -82,8 +84,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (payload: LoginPayload): Promise<LoginResponse> => {
+      // loginApi stores the tokens and returns { access_token, refresh_token }
       const data = await loginApi(payload);
-      setUser(data.user);
+      // Fetch user profile after login
+      try {
+        const me = await getProfileApi();
+        setUser(me);
+      } catch {
+        // Profile fetch failed — tokens are stored, user can retry
+      }
       return data;
     },
     [],
@@ -91,11 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(
     async (payload: RegisterPayload): Promise<RegisterResponse> => {
+      // Backend always requires email confirmation — no auto-login
       const data = await registerApi(payload);
-      // Auto-login if backend returns tokens
-      if (data.user && data.access) {
-        setUser(data.user);
-      }
       return data;
     },
     [],
@@ -122,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const me = await getMeApi();
+      const me = await getProfileApi();
       setUser(me);
     } catch {
       // Preserve existing user state if the refresh fails
