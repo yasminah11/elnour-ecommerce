@@ -1,44 +1,49 @@
 /**
- * Shared TypeScript types — matched to the backend Mongoose schema and controllers.
+ * Shared TypeScript types — matched to the ACTUAL backend Mongoose schema.
  *
- * Backend schema fields:
- *   firstName, lastName, email, password, phone
- *   googleId, authProvider (local | google)
- *   addresses: [addressSchema]
- *   billingInfo: { billingName, billingAddress }
- *   customerType: registered | business
- *   businessInfo: { companyName, companyBillingInfo }
- *   changeCredential: Date
- *   confirmed: Boolean
+ * Key differences from initial frontend assumptions:
+ *  - Address uses { city, details, isDefault } NOT { city, street, is_default }
+ *  - API responses are wrapped: { message: string, data: T }
+ *  - Tokens are { access_token, refresh_token } NOT { access, refresh }
+ *  - Auth header is "auth: bearer <token>" NOT "Authorization: Bearer <token>"
+ *  - Refresh token uses GET with "authentication" header
+ *  - Endpoints: /auth/user/* (not /auth/*)
+ *  - No separate /customers/addresses — addresses are inside profile
  */
 
 /* ─────────────────────────────────────────────
-   Tokens — backend returns JWT access + refresh
+   API Response wrapper — backend always returns { message, data }
+───────────────────────────────────────────── */
+
+export interface ApiResponse<T = unknown> {
+  message: string;
+  data?: T;
+}
+
+/* ─────────────────────────────────────────────
+   Tokens — backend returns access_token + refresh_token
 ───────────────────────────────────────────── */
 
 export interface TokenPair {
-  access: string;
-  refresh: string;
+  access_token: string;
+  refresh_token: string;
 }
 
 export interface DecodedToken {
   exp: number;
-  id?: string;
+  authId?: string;
 }
 
 /* ─────────────────────────────────────────────
    Address — FR-AUTH-06
+   Backend fields: city, details, isDefault (NOT street, is_default)
 ───────────────────────────────────────────── */
 
 export interface Address {
   _id: string;
-  label?: string;
   city: string;
-  street: string;
-  building?: string;
-  floor?: string;
-  apartment?: string;
-  is_default: boolean;
+  details: string; // backend uses "details" not "street"
+  isDefault: boolean; // backend uses "isDefault" not "is_default"
 }
 
 /* ─────────────────────────────────────────────
@@ -88,9 +93,8 @@ export interface LoginPayload {
 }
 
 export interface LoginResponse {
-  access: string;
-  refresh: string;
-  user: User;
+  access_token: string;
+  refresh_token: string;
 }
 
 export interface RegisterPayload {
@@ -98,7 +102,7 @@ export interface RegisterPayload {
   lastName: string;
   email: string;
   password: string;
-  cPassword: string; // confirm password — matches backend field name
+  cPassword: string;
   phone: string;
   address?: Omit<Address, "_id">;
   billingInfo?: BillingInfo;
@@ -107,16 +111,13 @@ export interface RegisterPayload {
 }
 
 export interface RegisterResponse {
-  user?: User;
-  access?: string;
-  refresh?: string;
-  /** Backend sends this when email confirmation is required */
-  message?: string;
+  message: string;
+  data?: User;
 }
 
 export interface RefreshResponse {
-  access: string;
-  refresh?: string;
+  access_token: string;
+  refresh_token?: string;
 }
 
 export interface UpdateProfilePayload {
@@ -150,19 +151,19 @@ export interface UpdatePasswordPayload {
 }
 
 /* ─────────────────────────────────────────────
-   Linked authentication providers (Google OAuth)
+   Address payloads
 ───────────────────────────────────────────── */
 
-export type AuthProvider = "google" | "local";
-
-export interface LinkedProvider {
-  provider: AuthProvider;
-  connected_at?: string;
+export interface AddAddressPayload {
+  city: string;
+  details: string;
+  isDefault?: boolean;
 }
 
-export interface LinkProviderPayload {
-  provider: AuthProvider;
-  token: string;
+export interface UpdateAddressPayload {
+  city?: string;
+  details?: string;
+  isDefault?: boolean;
 }
 
 /* ─────────────────────────────────────────────
@@ -175,4 +176,15 @@ export interface ApiError {
   status: number;
   message: string;
   fieldErrors?: ApiFieldErrors;
+}
+
+/* ─────────────────────────────────────────────
+   Linked authentication providers — derived from user.authProvider
+───────────────────────────────────────────── */
+
+export type AuthProvider = "google" | "local";
+
+export interface LinkedProvider {
+  provider: AuthProvider;
+  connected_at?: string;
 }
