@@ -1,23 +1,9 @@
 /**
- * Token storage layer.
- *
- * Stores the access and refresh tokens in browser cookies via js-cookie.
- *
- * Why cookies (not localStorage):
- *   - Cookies are readable by Next.js Middleware, enabling server-side
- *     route protection without an extra round-trip.
- *   - In production the backend can set HttpOnly + Secure flags on its own
- *     cookies; this client-side storage is for the frontend-managed tokens.
- *
- * ⚠️  REQUIRES BACKEND CONFIRMATION:
- *   - Whether the backend issues JWTs (so isTokenValid() is meaningful)
- *     or opaque tokens (in which case remove isTokenValid / decodeToken).
- *   - The actual TTL of access and refresh tokens — update
- *     config.auth.accessTokenCookieDays / refreshTokenCookieDays to match.
- *   - Whether "Secure" flag should be enabled (yes in production over HTTPS).
+ * Token storage — uses cookies (client-side accessible).
+ * Updated to match backend token field names: access_token, refresh_token
+ * Auth header: "auth: bearer <token>"  (NOT Authorization: Bearer)
  */
 
-import Cookies from "js-cookie";
 import { config } from "@/lib/config";
 import type { DecodedToken } from "@/lib/types/auth";
 
@@ -28,84 +14,68 @@ const {
   refreshTokenCookieDays,
 } = config.auth;
 
-/* ── Write ──────────────────────────────────────────────────────────── */
+/* ── Cookie helpers ──────────────────────────────────────────────────── */
 
-export function setTokens(access: string, refresh: string): void {
-  Cookies.set(accessTokenKey, access, {
-    expires: accessTokenCookieDays,
-    sameSite: "Lax",
-    // secure: true  ← uncomment when serving over HTTPS in production
-  });
-  Cookies.set(refreshTokenKey, refresh, {
-    expires: refreshTokenCookieDays,
-    sameSite: "Lax",
-  });
+function setCookie(name: string, value: string, days: number): void {
+  if (typeof document === "undefined") return;
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
 }
 
-export function setAccessToken(access: string): void {
-  Cookies.set(accessTokenKey, access, {
-    expires: accessTokenCookieDays,
-    sameSite: "Lax",
-  });
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(
+    new RegExp(
+      "(?:^|; )" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)",
+    ),
+  );
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
-/* ── Read ───────────────────────────────────────────────────────────── */
-
-export function getAccessToken(): string | undefined {
-  return Cookies.get(accessTokenKey);
+function deleteCookie(name: string): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 }
 
-export function getRefreshToken(): string | undefined {
-  return Cookies.get(refreshTokenKey);
-}
+/* ── Token decoding ──────────────────────────────────────────────────── */
 
-/* ── Delete ─────────────────────────────────────────────────────────── */
-
-export function clearTokens(): void {
-  Cookies.remove(accessTokenKey);
-  Cookies.remove(refreshTokenKey);
-}
-
-/* ── JWT decode (no signature verification) ─────────────────────────── */
-
-/**
- * Decodes the payload of a JWT without verifying its signature.
- * Used only to read the `exp` claim client-side so we can skip
- * obviously-expired tokens before making a network request.
- *
- *   Only call this if the backend confirmed it issues JWTs.
- *     If the backend uses opaque tokens, remove this function and
- *     replace hasValidSession() with a simple !!getAccessToken() check.
- */
-export function decodeToken(token: string): DecodedToken | null {
+function decodeJwt(token: string): DecodedToken | null {
   try {
-    const [, payloadB64] = token.split(".");
-    if (!payloadB64) return null;
-    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(json) as DecodedToken;
+    const payload = token.split(".")[1];
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
   } catch {
     return null;
   }
 }
 
-/**
- * Returns true when the token exists and its `exp` claim is in the future.
- *
- *   See isTokenValid() note above regarding JWT vs opaque tokens.
- */
-export function isTokenValid(token: string): boolean {
-  const decoded = decodeToken(token);
-  if (!decoded) return false;
-  // exp is in seconds; Date.now() is in milliseconds
-  return decoded.exp * 1000 > Date.now();
+/* ── Public API ──────────────────────────────────────────────────────── */
+
+export function setTokens(access_token: string, refresh_token: string): void {
+  setCookie(accessTokenKey, access_token, accessTokenCookieDays);
+  setCookie(refreshTokenKey, refresh_token, refreshTokenCookieDays);
 }
 
-/**
- * Returns true when a non-expired access token is present in storage.
- *
- *   See isTokenValid() note above regarding JWT vs opaque tokens.
- */
+export function setAccessToken(access_token: string): void {
+  setCookie(accessTokenKey, access_token, accessTokenCookieDays);
+}
+
+export function getAccessToken(): string | null {
+  return getCookie(accessTokenKey);
+}
+
+export function getRefreshToken(): string | null {
+  return getCookie(refreshTokenKey);
+}
+
+export function clearTokens(): void {
+  deleteCookie(accessTokenKey);
+  deleteCookie(refreshTokenKey);
+}
+
 export function hasValidSession(): boolean {
   const token = getAccessToken();
-  return !!token && isTokenValid(token);
+  if (!token) return false;
+  const decoded = decodeJwt(token);
+  if (!decoded || !decoded.exp) return false;
+  return decoded.exp * 1000 > Date.now();
 }
