@@ -1,17 +1,24 @@
 /**
- * Authentication service.
- * Routes matched to the backend auth controller.
+ * Authentication service — corrected to match ACTUAL backend endpoints.
  *
- * Backend endpoints (from the images):
- *   POST /auth/signin          — signIn controller
- *   POST /auth/signup          — signUp controller
- *   POST /auth/confirm-email   — confirmeEmail controller
- *   POST /auth/resend-otp      — resendOtp controller
- *   POST /auth/logout          — logout (clears refresh token)
- *   POST /auth/token/refresh   — token refresh
+ * Backend routes (app.controller.js → /auth/user prefix):
+ *   POST   /auth/user/sign-up          — signUp
+ *   PATCH  /auth/user/confirm-email    — confirmeEmail
+ *   POST   /auth/user/resend-otp       — resendOtp
+ *   POST   /auth/user/sign-in          — signIn
+ *   GET    /auth/user/refresh-token    — refresh_token (header: authentication)
+ *   POST   /auth/user/logout           — logout (requires auth)
+ *   PATCH  /auth/user/forget-password  — forgetPassword
+ *   PATCH  /auth/user/reset-password   — resetPassword
+ *   PATCH  /auth/user/update-password  — update_Password (requires auth)
+ *   GET    /auth/user/profile          — getProfile (requires auth)
+ *   PATCH  /auth/user/profile          — update_Profile (requires auth)
+ *   POST   /auth/user/address          — addAddress (requires auth)
+ *   PATCH  /auth/user/address/:id      — updateAddress (requires auth)
+ *   DELETE /auth/user/address/:id      — deleteAddress (requires auth)
  */
 
-import { apiPost, apiGet, apiDelete } from "@/lib/api/apiClient";
+import { apiPost, apiGet, apiPatch, apiDelete } from "@/lib/api/apiClient";
 import {
   setTokens,
   clearTokens,
@@ -25,18 +32,21 @@ import type {
   ConfirmEmailPayload,
   ResendOtpPayload,
   UpdatePasswordPayload,
-  AuthProvider,
-  LinkProviderPayload,
-  LinkedProvider,
+  User,
+  UpdateProfilePayload,
+  AddAddressPayload,
+  UpdateAddressPayload,
+  Address,
 } from "@/lib/types/auth";
 
 /* ── Sign In ─────────────────────────────────────────────────────────── */
 
 export async function loginApi(payload: LoginPayload): Promise<LoginResponse> {
-  const data = await apiPost<LoginResponse>("/auth/signin", payload, {
+  // Returns { message, data: { access_token, refresh_token } }
+  const data = await apiPost<LoginResponse>("/auth/user/sign-in", payload, {
     skipAuth: true,
   });
-  setTokens(data.access, data.refresh);
+  setTokens(data.access_token, data.refresh_token);
   return data;
 }
 
@@ -45,13 +55,10 @@ export async function loginApi(payload: LoginPayload): Promise<LoginResponse> {
 export async function registerApi(
   payload: RegisterPayload,
 ): Promise<RegisterResponse> {
-  const data = await apiPost<RegisterResponse>("/auth/signup", payload, {
+  // Returns { message: "account created, please confirm your email", data: user }
+  const data = await apiPost<RegisterResponse>("/auth/user/sign-up", payload, {
     skipAuth: true,
   });
-  // Backend may auto-login after signup or require email confirmation first
-  if (data.access && data.refresh) {
-    setTokens(data.access, data.refresh);
-  }
   return data;
 }
 
@@ -60,13 +67,13 @@ export async function registerApi(
 export async function confirmEmailApi(
   payload: ConfirmEmailPayload,
 ): Promise<void> {
-  await apiPost("/auth/confirm-email", payload, { skipAuth: true });
+  await apiPatch("/auth/user/confirm-email", payload, { skipAuth: true });
 }
 
 /* ── Resend OTP ──────────────────────────────────────────────────────── */
 
 export async function resendOtpApi(payload: ResendOtpPayload): Promise<void> {
-  await apiPost("/auth/resend-otp", payload, { skipAuth: true });
+  await apiPost("/auth/user/resend-otp", payload, { skipAuth: true });
 }
 
 /* ── Update Password ─────────────────────────────────────────────────── */
@@ -74,17 +81,14 @@ export async function resendOtpApi(payload: ResendOtpPayload): Promise<void> {
 export async function updatePasswordApi(
   payload: UpdatePasswordPayload,
 ): Promise<void> {
-  await apiPost("/auth/update-password", payload);
+  await apiPatch("/auth/user/update-password", payload);
 }
 
 /* ── Logout ──────────────────────────────────────────────────────────── */
 
 export async function logoutApi(): Promise<void> {
-  const refreshToken = getRefreshToken();
   try {
-    if (refreshToken) {
-      await apiPost("/auth/logout", { refresh: refreshToken });
-    }
+    await apiPost("/auth/user/logout", {});
   } catch {
     // Swallow — tokens are cleared regardless
   } finally {
@@ -92,18 +96,33 @@ export async function logoutApi(): Promise<void> {
   }
 }
 
-/* ── Linked Providers (Google OAuth) ─────────────────────────────────── */
+/* ── Get Profile ─────────────────────────────────────────────────────── */
 
-export async function getLinkedProvidersApi(): Promise<LinkedProvider[]> {
-  return apiGet<LinkedProvider[]>("/auth/linked-providers");
+export async function getProfileApi(): Promise<User> {
+  return apiGet<User>("/auth/user/profile");
 }
 
-export async function linkProviderApi(
-  payload: LinkProviderPayload,
-): Promise<LinkedProvider> {
-  return apiPost<LinkedProvider>("/auth/linked-providers", payload);
+/* ── Update Profile ──────────────────────────────────────────────────── */
+
+export async function updateProfileApi(
+  payload: UpdateProfilePayload,
+): Promise<User> {
+  return apiPatch<User>("/auth/user/profile", payload);
 }
 
-export async function unlinkProviderApi(provider: AuthProvider): Promise<void> {
-  await apiDelete(`/auth/linked-providers/${provider}`);
+/* ── Addresses (embedded in auth model) ──────────────────────────────── */
+
+export async function addAddressApi(payload: AddAddressPayload): Promise<void> {
+  await apiPost("/auth/user/address", payload);
+}
+
+export async function updateAddressApi(
+  addressId: string,
+  payload: UpdateAddressPayload,
+): Promise<void> {
+  await apiPatch(`/auth/user/address/${addressId}`, payload);
+}
+
+export async function deleteAddressApi(addressId: string): Promise<void> {
+  await apiDelete(`/auth/user/address/${addressId}`);
 }
