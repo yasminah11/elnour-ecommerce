@@ -28,6 +28,23 @@ import type {
   PaginatedResponse,
 } from "@/lib/types/catalog";
 
+/* ── Helper: build query string ──────────────────────────────── */
+// Generic so any typed params object is accepted without needing an index signature.
+function buildQs<T extends object>(params: T): string {
+  const entries = Object.entries(params as Record<string, unknown>).filter(
+    ([, v]) => v !== undefined && v !== null && v !== "",
+  );
+  if (!entries.length) return "";
+  return (
+    "?" +
+    entries
+      .map(
+        ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`,
+      )
+      .join("&")
+  );
+}
+
 /* ── List params ─────────────────────────────────────────────── */
 export interface ListParams {
   page?: number;
@@ -144,21 +161,4 @@ export async function getInventory(
   return apiGet<PaginatedResponse<InventoryRecord>>(`/catalog/inventory${qs}`, {
     skipAuth: true,
   });
-}
-
-/* ── Helper: build query string ──────────────────────────────── */
-
-function buildQs(params: Record<string, unknown>): string {
-  const entries = Object.entries(params).filter(
-    ([, v]) => v !== undefined && v !== null && v !== "",
-  );
-  if (!entries.length) return "";
-  return (
-    "?" +
-    entries
-      .map(
-        ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`,
-      )
-      .join("&")
-  );
 }
