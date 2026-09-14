@@ -19,11 +19,8 @@
  */
 
 import { apiPost, apiGet, apiPatch, apiDelete } from "@/lib/api/apiClient";
-import {
-  setTokens,
-  clearTokens,
-  getRefreshToken,
-} from "@/lib/auth/tokenStorage";
+import { setTokens, clearTokens } from "@/lib/auth/tokenStorage";
+
 import type {
   LoginPayload,
   LoginResponse,
