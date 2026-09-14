@@ -80,7 +80,6 @@ function ProductCard({
   const originalPrice = discountPercent
     ? Math.round(price / (1 - discountPercent / 100))
     : null;
-  const inStock = variant?.availabilityStatus === "inStock" || !variant;
   const isOutOfStock = variant?.availabilityStatus === "outOfStock";
 
   return (
@@ -220,13 +219,12 @@ function BrandLogo({ name }: { name: string }) {
    MAIN PAGE
 ────────────────────────────────────────────────────────────── */
 export default function Home() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [deals, setDeals] = useState<Promotion[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
-  const [cartAdding, setCartAdding] = useState<string | null>(null);
   const [cartSuccess, setCartSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -264,7 +262,6 @@ export default function Home() {
 
   /* ── Add to cart ──────────────────────────────────────────── */
   const handleAddToCart = async (variantId: string) => {
-    setCartAdding(variantId);
     try {
       await apiPost("/commerce/cart/items", {
         variant: variantId,
@@ -275,8 +272,6 @@ export default function Home() {
       setTimeout(() => setCartSuccess(null), 1500);
     } catch {
       // show nothing — cart endpoint can return errors for auth etc.
-    } finally {
-      setCartAdding(null);
     }
   };
 
